@@ -28,7 +28,7 @@ public class Application {
 
     final EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
 
-    final List<DnsNameResolver> resolvers = new LinkedList<>();
+    final List<Resolver> resolvers = new LinkedList<>();
 
     boolean verbose = false;
     int port = PORT;
@@ -47,29 +47,34 @@ public class Application {
 
         port = Integer.parseInt(it.next());
       } else {
-        resolvers.add(
+        final DnsNameResolver r =
             new DnsNameResolverBuilder(eventLoopGroup.next())
                 .channelType(NioDatagramChannel.class)
                 .resolveCache(new DefaultDnsCache())
                 .nameServerProvider(
                     new SequentialDnsServerAddressStreamProvider(
-                        Arrays.stream(arg.split(","))
+                        Arrays.stream(arg.replaceFirst("^#", "").split(","))
                             .map(ip -> new InetSocketAddress(ip, PORT))
                             .toArray(InetSocketAddress[]::new)))
-                .build());
+                .build();
+
+        resolvers.add(new Resolver(arg, r, arg.startsWith("#")));
       }
     }
 
     if (resolvers.isEmpty()) {
       resolvers.add(
-          new DnsNameResolverBuilder(eventLoopGroup.next())
-              .channelType(NioDatagramChannel.class)
-              .resolveCache(new DefaultDnsCache())
-              .nameServerProvider(
-                  new SequentialDnsServerAddressStreamProvider(
-                      new InetSocketAddress("1.1.1.1", PORT),
-                      new InetSocketAddress("8.8.8.8", PORT)))
-              .build());
+          new Resolver(
+              "1.1.1.1,8.8.8.8",
+              new DnsNameResolverBuilder(eventLoopGroup.next())
+                  .channelType(NioDatagramChannel.class)
+                  .resolveCache(new DefaultDnsCache())
+                  .nameServerProvider(
+                      new SequentialDnsServerAddressStreamProvider(
+                          new InetSocketAddress("1.1.1.1", PORT),
+                          new InetSocketAddress("8.8.8.8", PORT)))
+                  .build(),
+              false));
     }
 
     try {
