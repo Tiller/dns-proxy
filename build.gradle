@@ -1,0 +1,21 @@
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+repositories {
+    maven {
+        url "https://repo1.maven.org/maven2/"
+    }
+}
+
+application {
+    mainClass = 'com.stooit.Application'
+}
+
+
+dependencies {
+    implementation 'io.netty:netty-resolver-dns:4.1.101.Final'
+}
