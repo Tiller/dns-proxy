@@ -13,6 +13,8 @@ import io.netty.handler.codec.dns.DatagramDnsQuery;
 import io.netty.handler.codec.dns.DatagramDnsResponse;
 import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DnsQuestion;
+import io.netty.handler.codec.dns.DnsRawRecord;
+import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsResponse;
 import io.netty.handler.codec.dns.DnsResponseCode;
 import io.netty.handler.codec.dns.DnsSection;
@@ -40,7 +42,8 @@ public class DnsProxy extends SimpleChannelInboundHandler<DatagramDnsQuery> {
     if (verbose) {
       System.err.println("Received query: " + srcQuestion.name() + ", " + srcQuestion.type());
     }
-    final DnsQuestion question = new DefaultDnsQuestion(srcQuestion.name(), srcQuestion.type());
+    final DnsQuestion question =
+        new DefaultDnsQuestion(srcQuestion.name(), srcQuestion.type(), srcQuestion.dnsClass());
 
     final ResponseProcessor processor = new ResponseProcessor(context, query, verbose);
     for (final Resolver resolver : resolvers) {
@@ -53,7 +56,18 @@ public class DnsProxy extends SimpleChannelInboundHandler<DatagramDnsQuery> {
 
   private DnsResponse getResponse(final DnsResponse serverResponse, final DatagramDnsQuery query) {
     final DnsResponse response =
-        new DatagramDnsResponse(query.recipient(), query.sender(), query.id());
+        new DatagramDnsResponse(
+            query.recipient(),
+            query.sender(),
+            query.id(),
+            serverResponse.opCode(),
+            serverResponse.code());
+    response.setAuthoritativeAnswer(serverResponse.isAuthoritativeAnswer());
+    response.setTruncated(serverResponse.isTruncated());
+    response.setRecursionAvailable(serverResponse.isRecursionAvailable());
+    response.setRecursionDesired(serverResponse.isRecursionDesired());
+    response.setZ(serverResponse.z());
+    
     copySections(serverResponse, response);
     return response;
   }
@@ -66,7 +80,13 @@ public class DnsProxy extends SimpleChannelInboundHandler<DatagramDnsQuery> {
 
   private void copySection(final DnsResponse r1, final DnsResponse r2, final DnsSection section) {
     for (int i = 0; i < r1.count(section); i++) {
-      r2.addRecord(section, r1.recordAt(section, i));
+      final DnsRecord srcRec = r1.recordAt(section, i);
+      DnsRecord dstRec = srcRec;
+
+      if (srcRec instanceof DnsRawRecord srcRecR) {
+        dstRec = srcRecR.copy();
+      }
+      r2.addRecord(section, dstRec);
     }
   }
 
@@ -162,7 +182,7 @@ public class DnsProxy extends SimpleChannelInboundHandler<DatagramDnsQuery> {
       if (verbose) {
         System.err.println("Answering with " + forwardResponse + "\nDerived from " + response);
       }
-      
+
       context.writeAndFlush(forwardResponse);
       sent = true;
     }

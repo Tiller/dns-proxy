@@ -14,6 +14,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.dns.DatagramDnsQueryDecoder;
 import io.netty.handler.codec.dns.DatagramDnsResponseEncoder;
+import io.netty.handler.codec.dns.FixedDnsRecordEncoder;
 import io.netty.resolver.dns.DefaultDnsCache;
 import io.netty.resolver.dns.DnsNameResolver;
 import io.netty.resolver.dns.DnsNameResolverBuilder;
@@ -89,7 +90,9 @@ public class Application {
                 @Override
                 protected void initChannel(final NioDatagramChannel nioDatagramChannel) {
                   nioDatagramChannel.pipeline().addLast(new DatagramDnsQueryDecoder());
-                  nioDatagramChannel.pipeline().addLast(new DatagramDnsResponseEncoder());
+                  nioDatagramChannel
+                      .pipeline()
+                      .addLast(new DatagramDnsResponseEncoder(new FixedDnsRecordEncoder()));
                   nioDatagramChannel.pipeline().addLast(new DnsProxy(resolvers, verboseFinal));
                 }
               })
